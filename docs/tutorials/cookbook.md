@@ -389,6 +389,63 @@ WHERE
 BIND: ["1a"]
 ```
 
+## when foreign key and pk use the same column.
+
+```
+use Red:api<2>;
+
+model B { ... }
+
+model A is table<aa> {
+    has Int $.id is serial;
+    has Str $.name is column;
+}
+
+model B is table<bb> {
+    # Here, we can use this syntax to make bb.a_id column references aa.id
+    has Int $.a-id is column{ :id, :references{.id}, :model-name<A> };
+    has A $.a is relationship{ .a-id };
+    has Str $.name is column;
+}
+
+red-defaults default => database 'SQLite';
+
+schema(A, B).create;
+
+my $a = A.^create: :name('A');
+B.^create: :$a, :name('b');
+my $b = B.^load: :a-id($a.id);
+$b.raku.say;
+$b.a.raku.say
+```
+
+## Unique constraints with multiple column
+
+Name a group of column to add them on a unique constraint (each column can be on more than one group).
+
+```raku
+model BBB {
+    has Int $.id is serial;
+    has Str $.a1 is unique<a b>;
+    has Str $.a2 is unique<a b c d>;
+    has Str $.a3 is unique<a>;
+}
+```
+it will create a table like this:
+
+```sql
+CREATE TABLE b_b_b(
+   id integer NOT NULL primary key AUTOINCREMENT,
+   a1 varchar(255) NOT NULL ,
+   a2 varchar(255) NOT NULL ,
+   a3 varchar(255) NOT NULL ,
+   UNIQUE (a1, a2),
+   UNIQUE (a2),
+   UNIQUE (a2),
+   UNIQUE (a1, a2, a3)
+)
+```
+
 ## events
 
 If you want to run something every time a query is made by Red.

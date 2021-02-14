@@ -21,7 +21,7 @@ model Ticket { ... }
 model Person {
     has UInt    $.id        is serial;
     has Str     $.name      is column{ :!nullable };
-    has Ticket  @.tickets   is relationship{ .author-id };
+    has Ticket  @.tickets   is relationship( *.author-id, :model<Ticket> );
     method opened-tickets { @!tickets.grep: *.status.name eq "opened" }
 }
 
@@ -29,10 +29,10 @@ model Ticket is rw {
     has UInt            $.id        is serial;
     has Str             $.title     is column;
     has Str             $.body      is column;
-    has UInt            $.status-id is referencing{  TicketStatus.id };
-    has TicketStatus    $.status    is relationship{ .status-id } = new;
-    has UInt            $.author-id is referencing{  Person.id }
-    has Person          $.author    is relationship{ .author-id }
+    has UInt            $.status-id is referencing( *.id, :model<TicketStatus> );
+    has TicketStatus    $.status    is relationship( *.status-id, :model<TicketStatus> ) = new;
+    has UInt            $.author-id is referencing( *.id, :model<Person> );
+    has Person          $.author    is relationship( *.author-id, :model<Person> );
 }
 
 Ticket.^create-table;
@@ -49,11 +49,11 @@ me.tickets.create: :title("new ticket 04"), :body("Creating the last ticket just
 say "Tickets from { me.name }:";
 say "{ .status.name } - { .title }" for me.tickets;
 
-given me.tickets.head {
+given me.tickets.pick {
     say "closing ticket { .title }";
     .status = closed;
     .^save;
 }
 
-#say "Tickets from { me.name }:";
-#say "{ .status.name } - { .title }" for me.tickets;
+say "Tickets from { me.name }:";
+say "{ .status.name } - { .title }" for me.tickets;

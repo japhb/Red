@@ -13,7 +13,6 @@ use MetamodelX::Red::Model;
 use Red::Traits;
 use Red::Operators;
 use Red::Database;
-use Red::AST::Infixes;
 use Red::AST::Optimizer::AND;
 use Red::AST::Optimizer::OR;
 use Red::AST::Optimizer::Case;
@@ -21,10 +20,13 @@ use Red::Class;
 use Red::DB;
 use Red::Schema;
 use Red::Formater;
+use Red::AST::Infixes;
 
-class Red:ver<0.1.26>:api<2> {
+class Red:ver<0.1.29>:api<2> {
+    our %experimentals;
     method events   { Red::Class.instance.events }
     method emit(|c) { get-RED-DB.emit: |c        }
+    method experimentals { %experimentals }
 }
 
 BEGIN {
@@ -67,6 +69,14 @@ multi experimental($ where "experimental migrations" | "migrations") {
     Empty
 }
 
+multi experimental($ where "supply") {
+    use MetamodelX::Red::Supply;
+    MetamodelX::Red::Model.^add_role: MetamodelX::Red::Supply;
+    MetamodelX::Red::Model.^compose;
+
+    Empty
+}
+
 multi experimental("is-handling") {
     multi trait_mod:<is>(Mu:U $model, :$handling) {
         for $handling<> {
@@ -79,9 +89,24 @@ multi experimental("is-handling") {
     )
 }
 
+multi experimental("has-one") {
+    Empty
+}
+
 multi experimental($feature) { die "Experimental feature '{ $feature }' not recognized." }
 
 multi EXPORT(+@experimentals) {
+	#my $no = "no-optimization";
+    	#if @experimentals.none eq $no {
+    	#        require ::("Red::AST::Infixes");
+    	#        for <AND OR Case> -> $infix {
+    	#    	::("Red::AST::$infix").^add_role: ::("Red::AST::Optimizer::$infix");
+    	#    	::("Red::AST::$infix").^compose;
+    	#        }
+    	#} else {
+    	#        @experimentals .= grep: { $_ ne $no }
+    	#}
+    %Red::experimentals{$_} = True for @experimentals;
     Map(
         Red::Do::EXPORT::ALL::,
         Red::Traits::EXPORT::ALL::,
@@ -97,8 +122,6 @@ multi EXPORT(+@experimentals) {
 =begin head1
 Red
 =end head1
-
-Take a look at our Wiki: L<https://github.com/FCO/Red/wiki>
 
 Take a look at our Documentation: L<https://fco.github.io/Red/>
 

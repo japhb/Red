@@ -1,6 +1,20 @@
 Revision history for Red
 
 {{$NEXT}}
+    - Fix column type bug
+    - Add experimental update-/aggregate-supply
+    - Add no-optimization use's option
+
+0.1.29  2020-11-22T00:11:21Z
+    - fix in translation
+    - fix .join-model's column
+    - fix fallback
+
+0.1.28  2020-11-07T18:25:01Z
+    - create experimental `has-one`
+
+0.1.27  2020-10-31T21:28:57Z
+    - Unique constraint fixes
 
 0.1.26  2020-07-24T00:25:06+01:00
     - Add inflation to Str -> Duration
