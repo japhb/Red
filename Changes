@@ -1,6 +1,36 @@
 Revision history for Red
 
 {{$NEXT}}
+    - Fix has-one create
+
+0.1.38  2021-02-22T19:41:38Z
+    - Fix multi comparators conflict
+
+0.1.37  2021-02-22T19:08:09Z
+    - Add comparison to DateTime
+
+0.1.36  2021-02-20T23:44:52Z
+    - NM relationship sample and test
+
+0.1.35  2021-02-18T23:12:51Z
+    - Remove use lib from CLI
+    - add -I option to CLI
+    - add --debug option to CLI
+
+0.1.34  2021-02-18T01:53:05Z
+    - Use DB's table formatter
+
+0.1.33  2021-02-16T19:31:56Z
+    - Fix refresh
+
+0.1.32  2021-02-16T01:55:55Z
+    - Fix pre-compiled experimental features
+    - Fix formatter spelling
+
+0.1.31  2021-02-14T21:04:28Z
+    - Add experimental refreshable
+
+0.1.30  2021-02-14T20:53:39Z
     - Fix column type bug
     - Add experimental update-/aggregate-supply
     - Add no-optimization use's option

@@ -19,11 +19,12 @@ use Red::AST::Optimizer::Case;
 use Red::Class;
 use Red::DB;
 use Red::Schema;
-use Red::Formater;
+use Red::Formatter;
 use Red::AST::Infixes;
 
-class Red:ver<0.1.29>:api<2> {
+class Red:ver<0.1.38>:api<2> {
     our %experimentals;
+    our @experimental-roles;
     method events   { Red::Class.instance.events }
     method emit(|c) { get-RED-DB.emit: |c        }
     method experimentals { %experimentals }
@@ -47,32 +48,30 @@ my package EXPORTHOW {
 
 proto experimental(Str) {*}
 
-multi experimental($ where "shortname") {
+multi experimental("shortname") {
     MetamodelX::Red::Model.^add_method: "experimental-name", method (\model) { model.^shortname }
     MetamodelX::Red::Model.^compose;
     Empty
 }
 
-multi experimental($ where "formaters") {
-    MetamodelX::Red::Model.^add_method: "experimental-formater", method { True }
-    Red::Column.^add_method: "experimental-formater", method { True }
+multi experimental("formatters") {
+    MetamodelX::Red::Model.^add_method: "experimental-formatter", method { True }
+    Red::Column.^add_method: "experimental-formatter", method { True }
     MetamodelX::Red::Model.^compose;
     Red::Column.^compose;
     Empty
 }
 
 multi experimental($ where "experimental migrations" | "migrations") {
-    use MetamodelX::Red::Migration;
-    MetamodelX::Red::Model.^add_role: MetamodelX::Red::Migration;
-    MetamodelX::Red::Model.^compose;
+    require ::('MetamodelX::Red::Migration');
+    @Red::experimental-roles.push: ::('MetamodelX::Red::Migration');
 
     Empty
 }
 
-multi experimental($ where "supply") {
-    use MetamodelX::Red::Supply;
-    MetamodelX::Red::Model.^add_role: MetamodelX::Red::Supply;
-    MetamodelX::Red::Model.^compose;
+multi experimental("supply") {
+    require ::('MetamodelX::Red::Supply');
+    @Red::experimental-roles.push: ::('MetamodelX::Red::Supply');
 
     Empty
 }
@@ -93,15 +92,22 @@ multi experimental("has-one") {
     Empty
 }
 
+multi experimental("refreshable") {
+    require ::('MetamodelX::Red::Refreshable');
+    @Red::experimental-roles.push: ::('MetamodelX::Red::Refreshable');
+
+    Empty
+}
+
 multi experimental($feature) { die "Experimental feature '{ $feature }' not recognized." }
 
 multi EXPORT(+@experimentals) {
 	#my $no = "no-optimization";
     	#if @experimentals.none eq $no {
-    	#        require ::("Red::AST::Infixes");
+	#        require ::("Red::AST::Infixes");
     	#        for <AND OR Case> -> $infix {
-    	#    	::("Red::AST::$infix").^add_role: ::("Red::AST::Optimizer::$infix");
-    	#    	::("Red::AST::$infix").^compose;
+	#		::("Red::AST::$infix").^add_role: ::("Red::AST::Optimizer::$infix");
+	#		::("Red::AST::$infix").^compose;
     	#        }
     	#} else {
     	#        @experimentals .= grep: { $_ ne $no }
@@ -118,6 +124,10 @@ multi EXPORT(+@experimentals) {
 }
 
 =begin pod
+
+[![Build Status](https://github.com/FCO/Red/workflows/test/badge.svg)](https://github.com/FCO/Red/actions)
+
+[![Build Status](https://github.com/FCO/Red/workflows/ecosystem/badge.svg)](https://github.com/FCO/Red/actions)
 
 =begin head1
 Red

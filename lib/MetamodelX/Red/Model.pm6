@@ -25,7 +25,7 @@ use MetamodelX::Red::Describable;
 use MetamodelX::Red::OnDB;
 use MetamodelX::Red::Id;
 use MetamodelX::Red::Populatable;
-use Red::Formater;
+use Red::Formatter;
 use X::Red::Exceptions;
 use Red::Phaser;
 use Red::Event;
@@ -42,7 +42,7 @@ also does MetamodelX::Red::Describable;
 also does MetamodelX::Red::OnDB;
 also does MetamodelX::Red::Id;
 also does MetamodelX::Red::Populatable;
-also does Red::Formater;
+also does Red::Formatter;
 
 has Attribute @!columns;
 has Red::Column %!references;
@@ -52,6 +52,7 @@ has @!constraints;
 has $.table;
 has Bool $!temporary;
 has Bool $!default-null;
+has %!alias-cache;
 
 multi method emit(Mu $model, Red::Event $event) {
     start try get-RED-DB.emit: $event.clone: :model($model.WHAT)
@@ -72,7 +73,7 @@ method references(|) { %!references }
 
 #| Returns the table name for the model.
 method table(Mu \type) is rw {
-    $!table //= self.table-formater: type.HOW.?experimental-name(type) // type.^name
+    $!table //= self.table-formatter: type.HOW.?experimental-name(type) // type.^name
 }
 
 #| Returns the table alias
@@ -118,6 +119,14 @@ method set-helper-attrs(Mu \type) {
     self.MetamodelX::Red::Dirtable::set-helper-attrs(type);
     self.MetamodelX::Red::OnDB::set-helper-attrs(type);
     self.MetamodelX::Red::Id::set-helper-attrs(type);
+}
+
+method new(|c) {
+    my @eroles = @Red::experimental-roles.grep(self !~~ *).sort({ $^a.^name cmp $^b.^name});
+    if +@eroles {
+        return (self.^mixin: |@eroles).new(|c)
+    }
+    nextsame
 }
 
 #| Compose
@@ -206,12 +215,14 @@ multi method join(\model, \to-join, $on where *.^can("relationship-ast"), :$name
 }
 
 my UInt $alias_num = 1;
-method alias(Red::Model:U \type, Str $name = "{type.^name}_{$alias_num++}", :$base, :$relationship, :$join-type) {
+method alias(|c (Red::Model:U \type, Str $name = "{type.^name}_{$alias_num++}", :$base, :$relationship, :$join-type)) {
+    return %!alias-cache{$name} if %!alias-cache{$name}:exists;
     my \alias = ::?CLASS.new_type(:$name);
+    %!alias-cache{$name} := alias;
     my role RAlias[Red::Model:U \rtype, Str $rname, \alias, \rel, \base, \join-type, @cols] {
         method columns(|)     { @cols }
         method table(|)       { rtype.^table }
-        method as(|)          { self.table-formater: $rname }
+        method as(|)          { self.table-formatter: $rname }
         method orig(|)        { rtype }
         method join-type(|)   { join-type }
         method tables(|)      { [ |base.^tables, alias ] }
@@ -445,17 +456,25 @@ multi method create(\model, *%orig-pars, :$with where not .defined) is rw {
     my $RED-DB = get-RED-DB;
     {
         my $*RED-DB = $RED-DB;
-        my %relationships := set %.relationships.keys>>.name>>.substr: 2;
+        my %relationships = %.relationships.keys.map: {
+            .name.substr(2) => $_
+        }
         my %pars;
         my %positionals;
+        my %has-one{Mu};
 
         for %orig-pars.kv -> $name, $val {
             my \attr = model.^attributes.first(*.name.substr(2) eq $name);
             my \attr-type = attr.type;
-            if %relationships{ $name } {
+            with %relationships{ $name } {
                 my \attr-model = attr.relationship-model;
                 if $val ~~ Positional && attr-type ~~ Positional {
                     %positionals{$name} = $val
+                } elsif .has-one {
+                    die "Value of '$name' should be Associative" unless $val ~~ Associative;
+#                    my $type = attr.relationship-model;
+#                    try { attr-type.^find(|$val) } // attr-type.^create: |$val
+                    %has-one{$val} = attr
                 } elsif $val ~~ Associative && $val !~~ Red::Model {
                     %pars{$name} = do if attr-model ~~ Red::Model {
                         try { attr-model.^find(|$val) } // attr-model.^create: |$val
@@ -490,9 +509,18 @@ multi method create(\model, *%orig-pars, :$with where not .defined) is rw {
                 .reduce: { Red::AST::AND.new: $^a, $^b }
         }
 
+        my $no;
         for %positionals.kv -> $name, @val {
-            FIRST my $no = model.^find($filter);
+            FIRST $no = model.^find($filter);
             $no."$name"().create: |$_ for @val
+        }
+
+        for %has-one.kv -> %val, \attr {
+            FIRST $no //= model.^find($filter);
+            my $type = attr.relationship-model;
+            my $id-name = attr.rel.attr-name;
+            # What to do when there is moe than one id???
+            $type.^create: |%( |%val, $id-name => $no.^id-values.head )
         }
         self.apply-row-phasers($obj, AfterCreate);
         return-rw Proxy.new:
